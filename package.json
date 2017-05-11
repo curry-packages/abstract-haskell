@@ -15,7 +15,7 @@
     "exportedModules": [ "AbstractHaskell.Types", "AbstractHaskell.Goodies",
                          "AbstractHaskell.Printer" ],
     "source": {
-        "git": "https://git.ps.informatik.uni-kiel.de/curry-packages/abstract-hskell.git",
+        "git": "https://git.ps.informatik.uni-kiel.de/curry-packages/abstract-haskell.git",
         "tag": "$version"
     }
 }
