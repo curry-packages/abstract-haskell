@@ -13,5 +13,9 @@
         "kics2": ">= 2.0.0"
     },
     "exportedModules": [ "AbstractHaskell.Types", "AbstractHaskell.Goodies",
-                         "AbstractHaskell.Printer" ]
+                         "AbstractHaskell.Printer" ],
+    "source": {
+        "git": "https://git.ps.informatik.uni-kiel.de/curry-packages/abstract-hskell.git",
+        "tag": "$version"
+    }
 }
