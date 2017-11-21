@@ -12,7 +12,7 @@ module AbstractHaskell.Printer
   , ppDecls
   ) where
 
-import Pretty
+import Text.Pretty
 
 import AbstractHaskell.Types
 import AbstractHaskell.Goodies (tyVarsOf)
@@ -26,7 +26,7 @@ defaultOptions :: Options
 defaultOptions = Options { currentModule = "", qualImpModule = const False }
 
 pPrint :: Doc -> String
-pPrint = pretty 80
+pPrint = showWidth 80
 
 -- ---------------------------------------------------------------------------
 -- Functions to print an AbstractHaskell program in standard Haskell syntax
