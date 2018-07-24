@@ -5,8 +5,8 @@
 
 module AbstractHaskell.Goodies where
 
-import Char            (toLower)
-import List            ((\\), union)
+import Data.Char            (toLower)
+import Data.List            ((\\), union)
 
 import AbstractHaskell.Types
 

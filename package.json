@@ -1,13 +1,13 @@
 {
     "name": "abstract-haskell",
-    "version": "2.0.0",
+    "version": "3.0.0",
     "author": "Michael Hanus <Michael Hanus>",
     "synopsis": "Libraries to represent Haskell programs in Curry",
     "category": [ "Programming" ],
     "license": "BSD-3-Clause",
     "licenseFile": "LICENSE",
     "dependencies": {
-        "wl-pprint": ">= 0.0.1"
+        "wl-pprint": ">= 2.0.0"
     },
     "compilerCompatibility": {
         "pakcs": ">= 2.0.0",
