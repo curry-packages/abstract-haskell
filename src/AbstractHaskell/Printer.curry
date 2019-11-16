@@ -83,16 +83,16 @@ ppExports opts ts fs = tupledSpaced $ filter (not . isEmpty)
   ppTypeExport :: TypeDecl -> Doc
   ppTypeExport (Type     qn vis _ _)
     | vis == Public = ppQName opts qn <+> text "(..)"
-    | otherwise     = empty
+    | otherwise     = Text.Pretty.empty
   ppTypeExport (TypeSyn  qn vis _ _)
     | vis == Public = ppQName opts qn
-    | otherwise     = empty
-  ppTypeExport (Instance _  _   _ _) = empty
+    | otherwise     = Text.Pretty.empty
+  ppTypeExport (Instance _  _   _ _) = Text.Pretty.empty
 
   ppFuncExport :: FuncDecl -> Doc
   ppFuncExport (Func _ qn _ vis _ _)
     | vis == Public = ppPrefixQOp opts qn
-    | otherwise     = empty
+    | otherwise     = Text.Pretty.empty
 
 -- ---------------------------------------------------------------------------
 -- Imports + infix operator declarations
@@ -133,7 +133,7 @@ ppTypeDecl opts (TypeSyn qname _ vs ty) = indent $
    text "type" <+> ppName qname <+> fillSep (map ppTypeVar vs)
                </> equals <+> ppTypeExp opts ty
 ppTypeDecl opts (Type    qname _ vs cs)
-  | null cs   = empty
+  | null cs   = Text.Pretty.empty
   | otherwise = indent $
     (text "data" <+> ppName qname <+> fillSep (map ppTypeVar vs))
     $$ ppConsDecls opts cs
@@ -155,7 +155,7 @@ ppConsDecl o (Cons (_, qn) _ _ tys) = indent $ fillSep
 
 ppContexts :: Options -> [Context] -> Doc
 ppContexts opts cs
-  | null cs   = empty
+  | null cs   = Text.Pretty.empty
   | otherwise = tupled (map (ppContext opts) cs) <+> doubleArrow
 
 ppContext :: Options -> Context -> Doc
@@ -197,14 +197,14 @@ ppFuncDecl opts (Func cmt (_,name) _ _ ty (Rules rs))
   =  ppComment cmt
   $$ indent (ppTypeSig opts name ty)
   $$ vsep (map (ppRule opts name) rs)
-ppFuncDecl _    (Func _ _ _ _ _ External) = empty
+ppFuncDecl _    (Func _ _ _ _ _ External) = Text.Pretty.empty
 
 ppComment :: String -> Doc
 ppComment = vsep . map (\c -> text "---" <+> text c) . lines
 
 --- Shows an AbstractHaskell type signature of a given function name.
 ppTypeSig :: Options -> String -> TypeSig -> Doc
-ppTypeSig _    _ Untyped         = empty
+ppTypeSig _    _ Untyped         = Text.Pretty.empty
 ppTypeSig opts f (CType ctxt ty) = hsep [ ppPrefixOp f, doubleColon
                                         , ppScopedTyVars ty
                                         , ppContexts opts ctxt
@@ -213,7 +213,7 @@ ppTypeSig opts f (CType ctxt ty) = hsep [ ppPrefixOp f, doubleColon
 
 ppScopedTyVars :: TypeExpr -> Doc
 ppScopedTyVars ty
-  | null tvs  = empty
+  | null tvs  = Text.Pretty.empty
   | otherwise = text "forall" <+> fillSep (map ppTypeVar tvs) <+> dot
   where tvs = tyVarsOf ty
 
@@ -231,7 +231,7 @@ ppCond opts (c, e) = bar <+> ppExpr opts 0 c </> equals <+> ppExpr opts 0 e
 
 ppLocalDecls :: Options -> [LocalDecl] -> Doc
 ppLocalDecls opts ds
-  | null ds   = empty
+  | null ds   = Text.Pretty.empty
   | otherwise = text "where" $$ ppBlock opts ds
 
 ppBlock :: Options -> [LocalDecl] -> Doc
