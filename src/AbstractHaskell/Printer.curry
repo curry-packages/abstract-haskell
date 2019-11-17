@@ -20,10 +20,17 @@ import AbstractHaskell.Goodies (tyVarsOf)
 data Options = Options
   { currentModule :: String
   , qualImpModule :: String -> Bool -- should a module be qualified imported?
+  , traceFailure  :: Bool
+  , kics2Mode     :: Bool
   }
 
 defaultOptions :: Options
-defaultOptions = Options { currentModule = "", qualImpModule = const False }
+defaultOptions = Options
+  { currentModule = ""
+  , qualImpModule = const False
+  , traceFailure = False
+  , kics2Mode = False
+  }
 
 pPrint :: Doc -> String
 pPrint = showWidth 80
@@ -48,7 +55,7 @@ ppProg opts (Prog m is ts fs os) = compose (<$+$>)
 
 ppHeader :: Options -> String -> [TypeDecl] -> [FuncDecl] -> Doc
 ppHeader opts m ts fs = indent $ sep
-  [ text "module" <+> text m
+  [ text "module" <+> text (if traceFailure opts then addTrace m else m)
   , ppExports opts ts fs
   , text "where"
   ]
@@ -106,6 +113,8 @@ ppImport opts imp
     -- Import module qualified if required:
   | qualImpModule opts imp = indent $ fillSep $ map text
                                ["import", "qualified", imp]
+  | traceFailure opts      = indent $ fillSep $ map text $
+                               ["import", "qualified", addTrace imp, "as", imp]
   | otherwise              = indent $ text "import" <+> text imp
 
 ppOpDecls :: [OpDecl] -> Doc
@@ -176,8 +185,8 @@ ppTypeExpr o p (TCons     qn tys)
   | otherwise                    = parensIf (p > 1 && not (null tys))
                                  $ fillSep
                                  $ ppQName o qn : map (ppTypeExpr o 2) tys
-ppTypeExpr o p (ForallType vs cx t) = parensIf (p > 0) $
-  text "forall" <+> fillSep (map ppTypeVar vs) <+> dot <+> ppContexts o cx <+> ppTypeExp o t
+ppTypeExpr o p (ForallType vs cx t) = parensIf (p > 0) $ text "forall"
+  <+> fillSep (map ppTypeVar vs) <+> dot <+> ppContexts o cx <+> ppTypeExp o t
 
 ppTypeVar :: TVarIName -> Doc
 ppTypeVar (_, name) = text name
@@ -295,7 +304,15 @@ ppVar :: VarIName -> Doc
 ppVar (_, name) = text name
 
 ppLitPattern :: Options -> Literal -> Doc
-ppLitPattern _ l = ppLiteral l
+ppLitPattern opts l
+  | kics2Mode opts = case l of
+    Charc   _ -> wrapUnboxed (curryPrelude, "C_Char")
+    Floatc  _ -> wrapUnboxed (curryPrelude, "C_Float")
+    Intc    _ -> parens (ppQName opts (curryPrelude, "C_Char") <+>
+                         parens (ppLiteral l))
+    Stringc _ -> ppLiteral l
+  | otherwise =  ppLiteral l
+  where wrapUnboxed c = parens (ppQName opts c <+> ppLiteral l <> char '#')
 
 ppBranchExpr :: Options -> BranchExpr -> Doc
 ppBranchExpr opts (Branch p e) = indent $
@@ -369,3 +386,47 @@ list = fillEncloseSep lbracket rbracket (comma <> space)
 
 tupled :: [Doc] -> Doc
 tupled = fillEncloseSep lparen rparen (comma <> space)
+
+curryPrelude :: String
+curryPrelude = "Curry_Prelude"
+
+renameModule :: String -> String
+renameModule = onLastIdentifier ("Curry_" ++)
+
+unRenameModule :: String -> String
+unRenameModule = onLastIdentifier (dropPrefix "Curry_")
+
+addTrace :: String -> String
+addTrace = renameModule . onLastIdentifier ("Trace_" ++) . unRenameModule
+
+removeTrace :: String -> String
+removeTrace = renameModule . onLastIdentifier (dropPrefix "Trace_")
+            . unRenameModule
+
+onLastIdentifier :: (String -> String) -> String -> String
+onLastIdentifier f = joinModuleIdentifiers . onLast f . splitModuleIdentifiers
+
+onLast :: (a -> a) -> [a] -> [a]
+onLast _ []           = error "Names.onLast: empty list"
+onLast f [x]          = [f x]
+onLast f (x:xs@(_:_)) = x : onLast f xs
+
+--- Split up the components of a module identifier. For instance,
+--- `splitModuleIdentifiers "Data.Set"` evaluates to `["Data", "Set"]`.
+splitModuleIdentifiers :: String -> [String]
+splitModuleIdentifiers s = let (pref, rest) = break (== '.') s in
+  pref : case rest of
+    []     -> []
+    _ : s' -> splitModuleIdentifiers s'
+
+--- Join the components of a module identifier. For instance,
+--- `joinModuleIdentifiers ["Data", "Set"]` evaluates to `"Data.Set"`.
+joinModuleIdentifiers :: [String] -> String
+joinModuleIdentifiers = foldr1 combine
+  where combine xs ys = xs ++ '.' : ys
+
+dropPrefix :: String -> String -> String
+dropPrefix pfx s
+  | take n s == pfx = drop n s
+  | otherwise       = s
+  where n = length pfx
