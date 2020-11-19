@@ -77,7 +77,7 @@ tyVarsOf :: TypeExpr -> [TVarIName]
 tyVarsOf (TVar             tv) = [tv]
 tyVarsOf (FuncType      t1 t2) = tyVarsOf t1 `union` tyVarsOf t2
 tyVarsOf (TCons         _ tys) = foldr union [] (map tyVarsOf tys)
-tyVarsOf (ForallType tvs _ ty) = tyVarsOf ty \\ tvs
+tyVarsOf (ForallType tvs _ ty) = tyVarsOf ty \\ map fst tvs
 
 -- -----------------------------------------------------------------------------
 -- Goodies for function declarations
@@ -172,10 +172,12 @@ renameSymbolInProg ren (Prog name imports typedecls fundecls opdecls) =
 
 renameSymbolInTypeDecl :: (QName -> QName) -> TypeDecl -> TypeDecl
 renameSymbolInTypeDecl ren tdecl = case tdecl of
-  Type qf vis tvars cdecls  -> Type (ren qf) vis tvars
+  Type qf vis tvars cdecls    -> Type (ren qf) vis tvars
                                       (map (renameSymbolInConsDecl ren) cdecls)
-  TypeSyn qf vis tvars texp -> TypeSyn (ren qf) vis tvars
+  TypeSyn qf vis tvars texp   -> TypeSyn (ren qf) vis tvars
                                          (renameSymbolInTypeExpr ren texp)
+  TypeNew qf vis tvars cdecl  -> TypeNew (ren qf) vis tvars
+                                         (renameSymbolInNewConsDecl ren cdecl)
   Instance qf texp ctxt rules ->
     Instance (ren qf) (renameSymbolInTypeExpr ren texp)
               (map (renameSymbolInContext ren) ctxt)
@@ -187,6 +189,10 @@ renameSymbolInTypeDecl ren tdecl = case tdecl of
 renameSymbolInConsDecl :: (QName -> QName) -> ConsDecl -> ConsDecl
 renameSymbolInConsDecl ren (Cons qf ar vis texps) =
   Cons (ren qf) ar vis  (map (renameSymbolInTypeExpr ren) texps)
+
+renameSymbolInNewConsDecl :: (QName -> QName) -> NewConsDecl -> NewConsDecl
+renameSymbolInNewConsDecl ren (NewCons qf vis texp) =
+  NewCons (ren qf) vis $ renameSymbolInTypeExpr ren texp
 
 renameSymbolInTypeExpr :: (QName -> QName) -> TypeExpr -> TypeExpr
 renameSymbolInTypeExpr ren texp = case texp of
@@ -255,8 +261,8 @@ renameSymbolInTypeSig ren (CType tc te) =
   CType (map (renameSymbolInContext ren) tc) (renameSymbolInTypeExpr ren te)
 
 renameSymbolInContext :: (QName -> QName) -> Context -> Context
-renameSymbolInContext ren (Context qn texps) =
-  Context (ren qn) (map (renameSymbolInTypeExpr ren) texps)
+renameSymbolInContext ren (Context tvs cxs qn texps) =
+  Context tvs cxs (ren qn) (map (renameSymbolInTypeExpr ren) texps)
 
 renameSymbolInFunc :: (QName -> QName) -> FuncDecl -> FuncDecl
 renameSymbolInFunc ren (Func cmt qf ar vis ctype rules) =

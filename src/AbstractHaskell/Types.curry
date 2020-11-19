@@ -14,9 +14,9 @@ module AbstractHaskell.Types where
 
 --- Data type for representing a Haskell module in the intermediate form.
 --- A value of this data type has the form
---- 
+---
 ---    (CProg modname imports typedecls functions opdecls)
---- 
+---
 --- where modname: name of this module,
 ---       imports: list of modules names that are imported,
 ---       typedecls, opdecls, functions: see below
@@ -61,11 +61,12 @@ type TVarIName = (Int, String)
 data TypeDecl
   = Type     QName Visibility [TVarIName] [ConsDecl]
   | TypeSyn  QName Visibility [TVarIName] TypeExpr
+  | TypeNew  QName Visibility [TVarIName] NewConsDecl
   | Instance QName TypeExpr [Context] [(QName, Rule)]
   deriving Show
 
 --- A single type context is class name applied to type variables.
-data Context = Context QName [TypeExpr]
+data Context = Context [TVarIName] [Context] QName [TypeExpr]
   deriving (Eq,Show)
 
 --- A constructor declaration consists of the name and arity of the
@@ -73,6 +74,11 @@ data Context = Context QName [TypeExpr]
 data ConsDecl = Cons QName Int Visibility [TypeExpr]
   deriving Show
 
+--- A constructor declaration for a newtype consists
+--- of the name of the constructor
+--- and the argument type of the constructor.
+data NewConsDecl = NewCons QName Visibility TypeExpr
+    deriving Show
 
 --- Data type for type expressions.
 --- A type expression is either a type variable, a function type,
@@ -82,11 +88,16 @@ data ConsDecl = Cons QName Int Visibility [TypeExpr]
 ---       "Int", "Float", "Bool", "Char", "IO",
 ---       "()" (unit type), "(,...,)" (tuple types), "[]" (list type)
 data TypeExpr
-  = TVar TVarIName                            -- type variable
-  | FuncType TypeExpr TypeExpr                -- function type t1->t2
-  | TCons QName [TypeExpr]                    -- type constructor application
-                                              -- (TCons (module,name) arguments)
-  | ForallType [TVarIName] [Context] TypeExpr -- explicitly quantified type expression
+  = TVar TVarIName                                    -- type variable
+  | FuncType TypeExpr TypeExpr                        -- function type t1->t2
+  | TCons QName [TypeExpr]                            -- type constructor application
+                                                      -- (TCons (module,name) arguments)
+  | ForallType [(TVarIName, Kind)] [Context] TypeExpr -- explicitly quantified type expression
+  deriving (Eq,Show)
+
+data Kind
+  = KindStar
+  | KindArrow Kind Kind
   deriving (Eq,Show)
 
 --- Data type to represent the type signature of a defined function.

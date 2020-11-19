@@ -12,6 +12,7 @@ module AbstractHaskell.Printer
   , ppDecls
   ) where
 
+import Data.List (isPrefixOf)
 import Text.Pretty
 
 import AbstractHaskell.Types
@@ -94,6 +95,9 @@ ppExports opts ts fs = tupledSpaced $ filter (not . isEmpty)
   ppTypeExport (TypeSyn  qn vis _ _)
     | vis == Public = ppQName opts qn
     | otherwise     = Text.Pretty.empty
+  ppTypeExport (TypeNew  qn vis _ _)
+    | vis == Public = ppQName opts qn <+> text "(..)"
+    | otherwise     = Text.Pretty.empty
   ppTypeExport (Instance _  _   _ _) = Text.Pretty.empty
 
   ppFuncExport :: FuncDecl -> Doc
@@ -111,10 +115,9 @@ ppImports opts = vsep . map (ppImport opts)
 ppImport :: Options -> String -> Doc
 ppImport opts imp
     -- Import module qualified if required:
-  | qualImpModule opts imp = indent $ fillSep $ map text
-                               ["import", "qualified", imp]
-  | traceFailure opts      = indent $ fillSep $ map text $
-                               ["import", "qualified", addTrace imp, "as", imp]
+  | qualImpModule opts imp = indent $ fillSep $ map text $
+                               ["import", "qualified"] ++ if traceFailure opts then [addTrace imp, "as", imp]
+                                                                               else [imp]
   | otherwise              = indent $ text "import" <+> text imp
 
 ppOpDecls :: [OpDecl] -> Doc
@@ -141,6 +144,9 @@ ppTypeDecl :: Options -> TypeDecl -> Doc
 ppTypeDecl opts (TypeSyn qname _ vs ty) = indent $
    text "type" <+> ppName qname <+> fillSep (map ppTypeVar vs)
                </> equals <+> ppTypeExp opts ty
+ppTypeDecl opts (TypeNew qname _ vs c)  = indent $
+   text "newtype" <+> ppName qname <+> fillSep (map ppTypeVar vs)
+                  </> equals <+> ppNewConsDecl opts c
 ppTypeDecl opts (Type    qname _ vs cs)
   | null cs   = Text.Pretty.empty
   | otherwise = indent $
@@ -162,13 +168,21 @@ ppConsDecl :: Options -> ConsDecl -> Doc
 ppConsDecl o (Cons (_, qn) _ _ tys) = indent $ fillSep
                                     $ ppPrefixOp qn : map (ppTypeExpr o 2) tys
 
+--- pretty print a single newtype constructor declaration
+ppNewConsDecl :: Options -> NewConsDecl -> Doc
+ppNewConsDecl o (NewCons (_, qn) _ ty) = indent $ fillSep
+                                         [ppPrefixOp qn, ppTypeExpr o 2 ty]
+
 ppContexts :: Options -> [Context] -> Doc
 ppContexts opts cs
   | null cs   = Text.Pretty.empty
   | otherwise = tupled (map (ppContext opts) cs) <+> doubleArrow
 
 ppContext :: Options -> Context -> Doc
-ppContext opts (Context qn ts) = ppTypeExp opts (TCons qn ts)
+ppContext opts (Context tvs cxs qn ts) = quantifiedVars <+> ppContexts opts cxs
+                                                        <+> ppTypeExp opts (TCons qn ts)
+  where quantifiedVars | null tvs  = Text.Pretty.empty
+                       | otherwise = text "forall" <+> fillSep (map ppTypeVar tvs) <+> dot
 
 --- pretty a top-level type expression
 ppTypeExp :: Options -> TypeExpr -> Doc
@@ -186,7 +200,8 @@ ppTypeExpr o p (TCons     qn tys)
                                  $ fillSep
                                  $ ppQName o qn : map (ppTypeExpr o 2) tys
 ppTypeExpr o p (ForallType vs cx t) = parensIf (p > 0) $ text "forall"
-  <+> fillSep (map ppTypeVar vs) <+> dot <+> ppContexts o cx <+> ppTypeExp o t
+  <+> fillSep (map (ppTypeVar . fst) vs) <+> dot
+  <+> ppContexts o cx <+> ppTypeExp o t
 
 ppTypeVar :: TVarIName -> Doc
 ppTypeVar (_, name) = text name
@@ -308,7 +323,7 @@ ppLitPattern opts l
   | kics2Mode opts = case l of
     Charc   _ -> wrapUnboxed (curryPrelude, "C_Char")
     Floatc  _ -> wrapUnboxed (curryPrelude, "C_Float")
-    Intc    _ -> parens (ppQName opts (curryPrelude, "C_Char") <+>
+    Intc    _ -> parens (ppQName opts (curryPrelude, "C_Int") <+>
                          parens (ppLiteral l))
     Stringc _ -> ppLiteral l
   | otherwise =  ppLiteral l
@@ -387,20 +402,26 @@ list = fillEncloseSep lbracket rbracket (comma <> space)
 tupled :: [Doc] -> Doc
 tupled = fillEncloseSep lparen rparen (comma <> space)
 
+curryPrefix :: String
+curryPrefix = "Curry_"
+
+tracePrefix :: String
+tracePrefix = "Trace_"
+
 curryPrelude :: String
-curryPrelude = "Curry_Prelude"
+curryPrelude = renameModule "Prelude"
 
 renameModule :: String -> String
-renameModule = onLastIdentifier ("Curry_" ++)
+renameModule = onLastIdentifier (curryPrefix ++)
 
 unRenameModule :: String -> String
-unRenameModule = onLastIdentifier (dropPrefix "Curry_")
+unRenameModule = onLastIdentifier (dropPrefix curryPrefix)
 
 addTrace :: String -> String
-addTrace = renameModule . onLastIdentifier ("Trace_" ++) . unRenameModule
+addTrace = renameModule . onLastIdentifier (tracePrefix ++) . unRenameModule
 
 removeTrace :: String -> String
-removeTrace = renameModule . onLastIdentifier (dropPrefix "Trace_")
+removeTrace = renameModule . onLastIdentifier (dropPrefix tracePrefix)
             . unRenameModule
 
 onLastIdentifier :: (String -> String) -> String -> String
@@ -425,8 +446,7 @@ joinModuleIdentifiers :: [String] -> String
 joinModuleIdentifiers = foldr1 combine
   where combine xs ys = xs ++ '.' : ys
 
-dropPrefix :: String -> String -> String
+dropPrefix :: Eq a => [a] -> [a] -> [a]
 dropPrefix pfx s
-  | take n s == pfx = drop n s
-  | otherwise       = s
-  where n = length pfx
+  | pfx `isPrefixOf` s = drop (length pfx) s
+  | otherwise          = s
