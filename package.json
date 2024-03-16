@@ -13,7 +13,7 @@
     "exportedModules": [ "AbstractHaskell.Types", "AbstractHaskell.Goodies",
                          "AbstractHaskell.Printer" ],
     "source": {
-        "git": "https://git.ps.informatik.uni-kiel.de/curry-packages/abstract-haskell.git",
+        "git": "https://github.com/curry-packages/abstract-haskell.git",
         "tag": "$version"
     }
 }
